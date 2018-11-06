@@ -1,4 +1,11 @@
-version: '2.1'
+version: '3.1'
+
+volumes:
+    kong_data: {}
+
+networks:
+  kong-net:
+
 services:
   kong-database:
     image: postgres:9.5
@@ -6,21 +13,26 @@ services:
       - POSTGRES_USER=kong
       - POSTGRES_DB=kong
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: ["CMD", "pg_isready", "-U", "kong"]
       interval: 30s
       timeout: 30s
       retries: 3
     restart: on-failure
+    networks:
+      - kong-net
+    volumes:
+      - kong_data:/var/lib/postgresql/data
+  
   kong:
     image: kong:latest
     command: kong start --run-migrations
     depends_on:
-      kong-database:
-        condition: service_healthy
+      - kong-database
     environment:
       - KONG_DATABASE=postgres
       - KONG_PG_HOST=kong-database
       - KONG_PG_DATABASE=kong
+      - KONG_CASSANDRA_CONTACT_POINTS=kong-database
       - KONG_ADMIN_LISTEN=0.0.0.0:8001        
     ports:
       - "8000:8000"
@@ -28,4 +40,5 @@ services:
       - "8443:8443"
       - "8444:8444"
     restart: on-failure
-
+    networks:
+      - kong-net
